@@ -8,7 +8,7 @@
 
 //http://www.boost.org/doc/libs/1_39_0/doc/html/thread/synchronization.html#thread.synchronization.barriers.barrier
 
-namespace Utils
+namespace utils
 {
 
 template <typename T, int BUFFER_SIZE>
@@ -21,20 +21,20 @@ public:
     using TypeConstructor = std::function<T(void)>;
     using ObjectCheckFunction = std::function < void(const T&)>;
 
-    Pipe(TypeConstructor constructFunc = nullptr,
-         ProducerFunction prodFunc = nullptr,
-         ConsumerFunction consFunc = nullptr,
+    Pipe(ProducerFunction prodFunc,
+         ConsumerFunction consFunc,
+         TypeConstructor constructFunc = nullptr,
          ObjectCheckFunction checkFunc = nullptr)
-        : m_typeConstructor(constructFunc)
-        , m_prodFunc(prodFunc)
-        , m_consFunc(consFunc)
-        , m_checkFunc(checkFunc)
-        , m_pProducerThread(nullptr)
-        , m_pConsumerThread(nullptr)
-        , m_bStopPipe(false)
-        , m_produceCount(0)
-        , m_consumeCount(0)
-        , buffer(new T[BUFFER_SIZE])
+        : m_prodFunc{prodFunc}
+        , m_consFunc{consFunc}
+        , m_typeConstructor{constructFunc}
+        , m_checkFunc{checkFunc}
+        , m_pProducer{}
+        , m_pConsumer{}
+        , m_bStopPipe{false}
+        , m_produceCount{0}
+        , m_consumeCount{0}
+        , buffer{new T[BUFFER_SIZE]}
     {
         if (!constructFunc)
         {
@@ -47,19 +47,12 @@ public:
         }
     }
 
-    void setProducerConsumerCallbacks(ProducerFunction prodFunc,
-                                      ConsumerFunction consFunc)
-    {
-        m_prodFunc = prodFunc;
-        m_consFunc = consFunc;
-    }
-
-    void setTypeConstructor(TypeConstructor constructFunc)
+    auto setTypeConstructor(TypeConstructor constructFunc) -> void
     {
         m_typeConstructor = constructFunc;
     }
 
-    void setObjectCheckCallback(ObjectCheckFunction checkFunc)
+    auto setObjectCheckCallback(ObjectCheckFunction checkFunc) -> void
     {
         m_checkFunc = checkFunc;
     }
@@ -67,10 +60,9 @@ public:
     ~Pipe()
     {
         stop();
-        delete[] buffer;
     }
 
-    void start()
+    auto start() -> void
     {
         //check if the functions are set properly.
         if (m_prodFunc == nullptr || m_consFunc == nullptr)
@@ -118,26 +110,26 @@ public:
         };
 
         m_bStopPipe = false;
-        m_pProducerThread = std::async(produceFunc);
-        m_pConsumerThread = std::async(consumeFunc);
+        m_pProducer = std::async(produceFunc);
+        m_pConsumer = std::async(consumeFunc);
 
         // SetThreadPriority(m_pProducerThread->native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
 
     }
 
-    void stop()
+    auto stop() -> void
     {
         m_bStopPipe = true;
 
-        if (m_pProducerThread)
+        if (m_pProducer.valid())
         {
           m_pProducer.get();
           m_produceCount = 0;
         }
 
-        if (m_pConsumerThread)
+        if (m_pConsumer.valid())
         {
-            m_pConsumerThread.get();
+            m_pConsumer.get();
             m_consumeCount = 0;
         }
     }
@@ -153,7 +145,7 @@ private:
     std::atomic<int>        m_consumeCount;
     //boost::barrier          m_barrier;
     bool                    m_bStopPipe;
-    T*                      buffer;
+    std::unique_ptr<T[]>    buffer;
 };
 
 }

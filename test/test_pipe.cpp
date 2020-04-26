@@ -7,17 +7,50 @@
 #include <gtest/gtest.h>
 #include "pipe.h"
 
-class PipeShould : public ::testing::Test
+
+template<typename T>
+class SingleMemoryLocationPipeShould : public ::testing::Test
 {
 protected:
-    std::unique_ptr<Pipe> pipe_;
+    using SingleMemoryLocationPipe = utils::Pipe<T, 1>;
 
-    void SetUp(uint32_t tick_time)
+    std::unique_ptr<SingleMemoryLocationPipe> pipe_;
+
+    void SetUp(typename SingleMemoryLocationPipe::ProducerFunction prod, typename SingleMemoryLocationPipe::ConsumerFunction cons)
     {
-        pipe_ = std::make_unique<Pipe>();
+        pipe_ = std::make_unique<SingleMemoryLocationPipe>(prod, cons);
     }
 };
 
+using TestTypes =  ::testing::Types<int>;
+TYPED_TEST_SUITE(SingleMemoryLocationPipeShould, TestTypes);
+
+TYPED_TEST(SingleMemoryLocationPipeShould, CorrectlyWorkForTwoThreadsWithASingleMemoryLocation)
+{
+    int i = 0;
+    const int STOP = 10;
+    auto cv = std::condition_variable{};
+    auto prod = [&i, &STOP]() {
+        for (int j = 0; j < STOP; j++)
+            i = j;
+        return i;
+    };
+
+    auto cons = [&i, &cv, &STOP] (const int j) {
+        ASSERT_EQ(i, j);
+        if (i == STOP) {
+            cv.notify_one();
+        }
+    };
+
+    SetUp(prod, cons);
+
+    pipe_->start();
+
+    auto lock = std::mutex{};
+    auto ulk = std::unique_lock{lock};
+    cv.wait(ulk);
+}
 
 int main(int argc, char** argv)
 {
