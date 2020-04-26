@@ -3,12 +3,9 @@ load("@//:config.bzl", "platform_config", "package_copt")
 platform_config()
 
 cc_library(
-    name = "timer",
+    name = "pipe",
     hdrs = [
-        "include/timer.h"
-    ],
-    srcs = [
-        "src/timer.cpp",
+        "include/pipe.h"
     ],
     strip_include_prefix = "include",
     copts = package_copt,
@@ -16,12 +13,12 @@ cc_library(
 )
 
 cc_test(
-    name = "test_timer",
-    srcs = ["test/test_timer.cpp"],
+    name = "test_pipe",
+    srcs = ["test/test_pipe.cpp"],
     copts = package_copt,
     tags = ["unit"],
     deps = [
-        ":timer",
+        ":pipe",
         "@gtest//:gtest",
     ],
     visibility = ["//visibility:private"]
